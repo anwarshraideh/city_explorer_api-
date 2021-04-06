@@ -5,11 +5,15 @@ require('dotenv').config(); // npm i dotenv
 const express = require('express'); // npm i express
 const cors = require('cors');
 const superagent = require('superagent');
+const pg = require('pg');
 
-
-const PORT = process.env.PORT || 5000;
 const server = express();
 server.use(cors());
+
+const PORT = process.env.PORT || 5000;
+// const client = new pg.Client(process.env.DATABASE_URL);
+const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
 
 
 server.get('/', homeRouteHandler);
@@ -19,42 +23,64 @@ server.get('/parks', parksHandler);
 server.get('*', notFoundHandler);
 
 
-function homeRouteHandler(req,res){
-  res.status(200).send('you server is working');
-}
-
-function notFoundHandler(req,res){
-
-  let errObj = {
-    status: 500,
-    responseText: 'Sorry, something went wrong'
-  };
-  res.status(500).send(errObj);
-}
-
 // request url (browser): localhost:3000/location
+
 function locationHandler(req,res){
 
   let cityName = req.query.city;
   let key = process.env.LOCATION_KEY;
   let LocationURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
 
-  superagent.get(LocationURL)
-    .then(geoData => {
-      console.log('inside superagent');
-      console.log(geoData.body);
-      let gData = geoData.body;
-      const locationData = new Location(cityName, gData);
-      res.send(locationData);
+  const sqLOC = `SELECT * FROM locations WHERE search_query = $1;`;
+  let city = [cityName];
+
+
+  client.query(sqLOC , city )
+    .then(data => {
+
+      console.log(data);
+      if (data.rows.length === 0) {
+        superagent.get(LocationURL)
+          .then(geoData => {
+
+            let gData = geoData.body;
+            const locationData = new Location(cityName, gData);
+
+            let locValueInsert = 'INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES($1, $2, $3, $4) RETURNING *;';
+            let safeValues = [cityName,locationData.formatted_query,locationData.latitude,locationData.longitude];
+
+            client.query(locValueInsert , safeValues)
+              .then ((data) =>
+              {
+                res.send(locationData);
+              });
+          })
+
+
+          .catch(error => {
+            console.log('inside superagent');
+            console.log('Error in getting data from LocationIQ server');
+            console.error(error);
+            res.send(error);
+          });
+
+
+
+      }
+      else if (data.rows[0].search_query === cityName)
+      {
+
+        const Obj = new Location(data.rows[0].search_query, data.rows[0]);
+        res.send(Obj);
+      }
+
 
     })
+    .catch (error => 
+      console.log( error)
+    );
 
-    .catch(error => {
-      console.log('inside superagent');
-      console.log('Error in getting data from LocationIQ server');
-      console.error(error);
-      res.send(error);
-    });
+
 }
 
 
@@ -62,22 +88,19 @@ function locationHandler(req,res){
 function weatherHandler(req,res)
 {
 
-
   console.log(req.query);
-
   let cityn = req.query.search_query;
   let key = process.env.WEATHER_KEY;
   let lat = req.query.latitude;
   let lon = req.query.longitude;
-  let weatherURL = `https://api.weatherbit.io/v2.0/forecast/daily?lat=${lat}&lon=${lon}&key=${key}&city=${cityn}`;
-
-
+  let weatherURL = `https://api.weatherbit.io/v2.0/forecast/daily?lat=${lat}&lon=${lon}&key=${key}&city=${cityn}&days=8`;
   superagent.get(weatherURL)
     .then(weatherData => {
-      let Data = weatherData.body.data;
-      let ArrOfWeather = Data.map(value => {
+
+      let ArrOfWeather = weatherData.body.data.map(value => {
         return new Weather (value);
       });
+
       res.send(ArrOfWeather);
 
     })
@@ -125,10 +148,10 @@ function parksHandler(req, res) {
 
 
 
-function Weather (data)
+function Weather (wdata)
 {
-  this.forecast = data.weather.description;
-  this.time = new Date(data.datetime).toDateString();
+  this.forecast = wdata.weather.description;
+  this.time = new Date(wdata.datetime).toDateString();
 
 }
 
@@ -148,6 +171,23 @@ function Park(data){
 }
 
 
-server.listen(PORT,()=>{
-  console.log(`Listening on PORT ${PORT}`);
-});
+function homeRouteHandler(req,res){
+  res.status(200).send('you server is working');
+}
+
+function notFoundHandler(req,res){
+
+  let errObj = {
+    status: 500,
+    responseText: 'Sorry, something went wrong'
+  };
+  res.status(500).send(errObj);
+}
+
+client.connect()
+  .then(() => {
+    server.listen(PORT,()=>
+      console.log(`Listening on PORT ${PORT}`)
+    );
+  });
+
