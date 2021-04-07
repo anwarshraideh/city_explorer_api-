@@ -11,8 +11,8 @@ const server = express();
 server.use(cors());
 
 const PORT = process.env.PORT || 5000;
-// const client = new pg.Client(process.env.DATABASE_URL);
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const client = new pg.Client(process.env.DATABASE_URL);
+// const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 
 
@@ -20,10 +20,71 @@ server.get('/', homeRouteHandler);
 server.get('/location', locationHandler);
 server.get('/weather', weatherHandler);
 server.get('/parks', parksHandler);
+server.get('/movies', MoviesHandler);
+server.get('/yelp', yelpHandler);
 server.get('*', notFoundHandler);
 
 
 // request url (browser): localhost:3000/location
+//lab8
+// function locationHandler(req,res){
+
+//   let cityName = req.query.city;
+//   let key = process.env.LOCATION_KEY;
+//   let LocationURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
+
+//   const sqLOC = `SELECT * FROM locations WHERE search_query = $1;`;
+//   let city = [cityName];
+
+
+//   client.query(sqLOC , city )
+//     .then(data => {
+
+//       console.log(data);
+
+//       if (data.rows.length === 0) {
+//         superagent.get(LocationURL)
+//           .then(geoData => {
+
+//             let gData = geoData.body;
+//             let locationData = new Location(cityName, gData);
+
+//             let locValueInsert = 'INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES($1, $2, $3, $4) RETURNING *;';
+//             let safeValues = [cityName,locationData.formatted_query,locationData.latitude,locationData.longitude];
+
+//             client.query(locValueInsert , safeValues)
+//               .then ((data) =>
+//               {
+//                 res.send(locationData);
+//               });
+//           })
+
+
+//           .catch(error => {
+//             console.log('inside superagent');
+//             console.log('Error in getting data from LocationIQ server');
+//             console.error(error);
+//             res.send(error);
+//           });
+
+
+
+//       }
+//       else if (data.rows[0].search_query === cityName)
+// else if (data.rows[0].length != 0)
+//       {
+
+//         const Obj = new Location(data.rows[0].search_query, data.rows[0]);
+//         res.send(Obj);
+//       }
+
+
+//     })
+//     .catch (error => console.log( error)
+//     );
+
+
+// }
 
 function locationHandler(req,res){
 
@@ -31,56 +92,22 @@ function locationHandler(req,res){
   let key = process.env.LOCATION_KEY;
   let LocationURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
 
-  const sqLOC = `SELECT * FROM locations WHERE search_query = $1;`;
-  let city = [cityName];
-
-
-  client.query(sqLOC , city )
-    .then(data => {
-
-      console.log(data);
-      if (data.rows.length === 0) {
-        superagent.get(LocationURL)
-          .then(geoData => {
-
-            let gData = geoData.body;
-            const locationData = new Location(cityName, gData);
-
-            let locValueInsert = 'INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES($1, $2, $3, $4) RETURNING *;';
-            let safeValues = [cityName,locationData.formatted_query,locationData.latitude,locationData.longitude];
-
-            client.query(locValueInsert , safeValues)
-              .then ((data) =>
-              {
-                res.send(locationData);
-              });
-          })
-
-
-          .catch(error => {
-            console.log('inside superagent');
-            console.log('Error in getting data from LocationIQ server');
-            console.error(error);
-            res.send(error);
-          });
-
-
-
-      }
-      else if (data.rows[0].search_query === cityName)
-      {
-
-        const Obj = new Location(data.rows[0].search_query, data.rows[0]);
-        res.send(Obj);
-      }
-
+  superagent.get(LocationURL)
+    .then(geoData => {
+      console.log('inside superagent');
+      console.log(geoData.body);
+      let gData = geoData.body;
+      const locationData = new Location(cityName, gData);
+      res.send(locationData);
 
     })
-    .catch (error => 
-      console.log( error)
-    );
 
-
+    .catch(error => {
+      console.log('inside superagent');
+      console.log('Error in getting data from LocationIQ server');
+      console.error(error);
+      res.send(error);
+    });
 }
 
 
@@ -144,6 +171,71 @@ function parksHandler(req, res) {
 
 
 
+}
+
+function yelpHandler (req , res) {
+
+  let key = process.env.YELP_API_KEY;
+  let page = req.query.page;
+
+  let limit = 5;
+  let start = ((page - 1) * 5 + 1);
+  let lat = req.query.latitude;
+  let lon = req.query.longitude;
+  let ylepUrl = `https://api.yelp.com/v3/businesses/search?latitude=${lat}&longitude=${lon}&limit=${limit}&offset=${start}`;
+
+  superagent.get(ylepUrl)
+    .set('Authorization', `Bearer ${key}`)
+    .then(yData => {
+
+      let yelpData = yData.body.businesses;
+      let yelpArray = yelpData.map(item => new Yelp(item));
+      res.send(yelpArray);
+
+    })
+
+    .catch(( error) => {
+      console.log('Error in getting data '+ error);
+    });
+
+}
+
+function MoviesHandler(req , res) {
+
+  let city = req.query.search_query;
+  let movkey = process.env.MOVIE_API_KEY;
+  let movUrl = `https://api.themoviedb.org/3/search/movie?api_key=${movkey}&query=${city}`;
+
+  superagent.get(movUrl)
+    .then(movData => {
+      let DataResultsArr = movData.body.results;
+      let movieArray = DataResultsArr.map(item => new Movie(item));
+      res.send(movieArray);
+    })
+    .catch((error) => {
+      console.log('error in getting data ' + error);
+    });
+
+}
+
+function Movie(moviesData) {
+
+  this.title = moviesData.title;
+  this.overview = moviesData.overview;
+  this.average_votes = moviesData.average_votes;
+  this.total_votes = moviesData.total_votes;
+  this.image_url = `https://image.tmdb.org/t/p/w500${moviesData.poster_path}`;
+  this.popularity = moviesData.popularity;
+  this.released_on = moviesData.released_on;
+}
+
+
+function Yelp(yelpData) {
+  this.name = yelpData.name;
+  this.image_url = yelpData.image_url;
+  this.price = yelpData.price;
+  this.rating = yelpData.rating;
+  this.url = yelpData.url;
 }
 
 
