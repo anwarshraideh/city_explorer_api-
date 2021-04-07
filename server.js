@@ -143,8 +143,6 @@ function weatherHandler(req,res)
 
 }
 
-
-
 function parksHandler(req, res) {
   console.log(req.query);
 
@@ -282,4 +280,3 @@ client.connect()
       console.log(`Listening on PORT ${PORT}`)
     );
   });
-
