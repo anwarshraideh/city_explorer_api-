@@ -11,8 +11,10 @@ const server = express();
 server.use(cors());
 
 const PORT = process.env.PORT || 5000;
-const client = new pg.Client(process.env.DATABASE_URL);
-// const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+//const client = new pg.Client(process.env.DATABASE_URL);
+const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
 
 
 
@@ -28,6 +30,8 @@ function homeRouteHandler(req,res){
   res.status(200).send('you server is working');
 }
 
+
+// request url (browser): localhost:3000/location
 
 function locationHandler(req,res){
 
@@ -66,6 +70,7 @@ function locationHandler(req,res){
                 res.send(result.rows[0]);
 
               });
+
           })
 
           .catch(error => {
@@ -77,9 +82,6 @@ function locationHandler(req,res){
       }
 
     });
-
-}
-
 
 
 function weatherHandler(req,res)
@@ -109,8 +111,6 @@ function weatherHandler(req,res)
       res.send(error);
     });
 
-
-
 }
 
 function parksHandler(req, res) {
@@ -136,8 +136,6 @@ function parksHandler(req, res) {
       console.error(error);
       res.send(error);
     });
-
-
 
 }
 
