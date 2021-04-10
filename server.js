@@ -26,8 +26,13 @@ server.get('/movies', MoviesHandler);
 server.get('/yelp', yelpHandler);
 server.get('*', notFoundHandler);
 
+function homeRouteHandler(req,res){
+  res.status(200).send('you server is working');
+}
+
 
 // request url (browser): localhost:3000/location
+
 function locationHandler(req,res){
 
   let cityName = req.query.city;
@@ -66,7 +71,6 @@ function locationHandler(req,res){
 
               });
 
-
           })
 
           .catch(error => {
@@ -78,8 +82,6 @@ function locationHandler(req,res){
       }
 
     });
-
-
 
 
 function weatherHandler(req,res)
@@ -137,6 +139,25 @@ function parksHandler(req, res) {
 
 }
 
+
+function MoviesHandler(req , res) {
+
+  let city = req.query.search_query;
+  let movkey = process.env.MOVIE_API_KEY;
+  let movUrl = `https://api.themoviedb.org/3/search/movie?api_key=${movkey}&query=${city}`;
+
+  superagent.get(movUrl)
+    .then(movData => {
+      let DataResultsArr = movData.body.results;
+      let movieArray = DataResultsArr.map(item => new Movie(item));
+      res.send(movieArray);
+    })
+    .catch((error) => {
+      console.log('error in getting data ' + error);
+    });
+
+}
+
 function yelpHandler (req , res) {
 
   let key = process.env.YELP_API_KEY;
@@ -164,44 +185,6 @@ function yelpHandler (req , res) {
 
 }
 
-function MoviesHandler(req , res) {
-
-  let city = req.query.search_query;
-  let movkey = process.env.MOVIE_API_KEY;
-  let movUrl = `https://api.themoviedb.org/3/search/movie?api_key=${movkey}&query=${city}`;
-
-  superagent.get(movUrl)
-    .then(movData => {
-      let DataResultsArr = movData.body.results;
-      let movieArray = DataResultsArr.map(item => new Movie(item));
-      res.send(movieArray);
-    })
-    .catch((error) => {
-      console.log('error in getting data ' + error);
-    });
-
-}
-
-function Movie(moviesData) {
-
-  this.title = moviesData.title;
-  this.overview = moviesData.overview;
-  this.average_votes = moviesData.average_votes;
-  this.total_votes = moviesData.total_votes;
-  this.image_url = `https://image.tmdb.org/t/p/w500${moviesData.poster_path}`;
-  this.popularity = moviesData.popularity;
-  this.released_on = moviesData.released_on;
-}
-
-
-function Yelp(yelpData) {
-  this.name = yelpData.name;
-  this.image_url = yelpData.image_url;
-  this.price = yelpData.price;
-  this.rating = yelpData.rating;
-  this.url = yelpData.url;
-}
-
 
 
 function Weather (wdata)
@@ -227,9 +210,27 @@ function Park(data){
 }
 
 
-function homeRouteHandler(req,res){
-  res.status(200).send('you server is working');
+function Movie(moviesData) {
+
+  this.title = moviesData.title;
+  this.overview = moviesData.overview;
+  this.average_votes = moviesData.average_votes;
+  this.total_votes = moviesData.total_votes;
+  this.image_url = `https://image.tmdb.org/t/p/w500${moviesData.poster_path}`;
+  this.popularity = moviesData.popularity;
+  this.released_on = moviesData.released_on;
 }
+
+
+function Yelp(yelpData) {
+  this.name = yelpData.name;
+  this.image_url = yelpData.image_url;
+  this.price = yelpData.price;
+  this.rating = yelpData.rating;
+  this.url = yelpData.url;
+}
+
+
 
 function notFoundHandler(req,res){
 
