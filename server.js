@@ -11,8 +11,10 @@ const server = express();
 server.use(cors());
 
 const PORT = process.env.PORT || 5000;
+
 //const client = new pg.Client(process.env.DATABASE_URL);
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
 
 
 
@@ -20,6 +22,8 @@ server.get('/', homeRouteHandler);
 server.get('/location', locationHandler);
 server.get('/weather', weatherHandler);
 server.get('/parks', parksHandler);
+server.get('/movies', MoviesHandler);
+server.get('/yelp', yelpHandler);
 server.get('*', notFoundHandler);
 
 
@@ -75,7 +79,8 @@ function locationHandler(req,res){
 
     });
 
-}
+
+
 
 function weatherHandler(req,res)
 {
@@ -106,8 +111,6 @@ function weatherHandler(req,res)
 
 }
 
-
-
 function parksHandler(req, res) {
   console.log(req.query);
 
@@ -132,6 +135,71 @@ function parksHandler(req, res) {
       res.send(error);
     });
 
+}
+
+function yelpHandler (req , res) {
+
+  let key = process.env.YELP_API_KEY;
+  let page = req.query.page;
+
+  let limit = 5;
+  let start = ((page - 1) * 5 + 1);
+  let lat = req.query.latitude;
+  let lon = req.query.longitude;
+  let ylepUrl = `https://api.yelp.com/v3/businesses/search?latitude=${lat}&longitude=${lon}&limit=${limit}&offset=${start}`;
+
+  superagent.get(ylepUrl)
+    .set('Authorization', `Bearer ${key}`)
+    .then(yData => {
+
+      let yelpData = yData.body.businesses;
+      let yelpArray = yelpData.map(item => new Yelp(item));
+      res.send(yelpArray);
+
+    })
+
+    .catch(( error) => {
+      console.log('Error in getting data '+ error);
+    });
+
+}
+
+function MoviesHandler(req , res) {
+
+  let city = req.query.search_query;
+  let movkey = process.env.MOVIE_API_KEY;
+  let movUrl = `https://api.themoviedb.org/3/search/movie?api_key=${movkey}&query=${city}`;
+
+  superagent.get(movUrl)
+    .then(movData => {
+      let DataResultsArr = movData.body.results;
+      let movieArray = DataResultsArr.map(item => new Movie(item));
+      res.send(movieArray);
+    })
+    .catch((error) => {
+      console.log('error in getting data ' + error);
+    });
+
+}
+
+function Movie(moviesData) {
+
+  this.title = moviesData.title;
+  this.overview = moviesData.overview;
+  this.average_votes = moviesData.average_votes;
+  this.total_votes = moviesData.total_votes;
+  this.image_url = `https://image.tmdb.org/t/p/w500${moviesData.poster_path}`;
+  this.popularity = moviesData.popularity;
+  this.released_on = moviesData.released_on;
+}
+
+
+function Yelp(yelpData) {
+  this.name = yelpData.name;
+  this.image_url = yelpData.image_url;
+  this.price = yelpData.price;
+  this.rating = yelpData.rating;
+  this.url = yelpData.url;
 }
 
 
@@ -178,4 +246,3 @@ client.connect()
       console.log(`Listening on PORT ${PORT}`)
     );
   });
-
