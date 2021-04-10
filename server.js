@@ -11,8 +11,10 @@ const server = express();
 server.use(cors());
 
 const PORT = process.env.PORT || 5000;
-const client = new pg.Client(process.env.DATABASE_URL);
-// const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+//const client = new pg.Client(process.env.DATABASE_URL);
+const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
 
 
 
@@ -26,89 +28,57 @@ server.get('*', notFoundHandler);
 
 
 // request url (browser): localhost:3000/location
-//lab8
-// function locationHandler(req,res){
-
-//   let cityName = req.query.city;
-//   let key = process.env.LOCATION_KEY;
-//   let LocationURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
-
-//   const sqLOC = `SELECT * FROM locations WHERE search_query = $1;`;
-//   let city = [cityName];
-
-
-//   client.query(sqLOC , city )
-//     .then(data => {
-
-//       console.log(data);
-
-//       if (data.rows.length === 0) {
-//         superagent.get(LocationURL)
-//           .then(geoData => {
-
-//             let gData = geoData.body;
-//             let locationData = new Location(cityName, gData);
-
-//             let locValueInsert = 'INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES($1, $2, $3, $4) RETURNING *;';
-//             let safeValues = [cityName,locationData.formatted_query,locationData.latitude,locationData.longitude];
-
-//             client.query(locValueInsert , safeValues)
-//               .then ((data) =>
-//               {
-//                 res.send(locationData);
-//               });
-//           })
-
-
-//           .catch(error => {
-//             console.log('inside superagent');
-//             console.log('Error in getting data from LocationIQ server');
-//             console.error(error);
-//             res.send(error);
-//           });
-
-
-
-//       }
-//       else if (data.rows[0].search_query === cityName)
-// else if (data.rows[0].length != 0)
-//       {
-
-//         const Obj = new Location(data.rows[0].search_query, data.rows[0]);
-//         res.send(Obj);
-//       }
-
-
-//     })
-//     .catch (error => console.log( error)
-//     );
-
-
-// }
-
 function locationHandler(req,res){
 
   let cityName = req.query.city;
-  let key = process.env.LOCATION_KEY;
-  let LocationURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
+  let sql = `SELECT FROM locations WHERE search_query=$1;`;
+  let safeValue = [cityName];
 
-  superagent.get(LocationURL)
-    .then(geoData => {
-      console.log('inside superagent');
-      console.log(geoData.body);
-      let gData = geoData.body;
-      const locationData = new Location(cityName, gData);
-      res.send(locationData);
+  client.query(sql , safeValue)
+    .then(result =>{
+      console.log('dddd', result.rows);
+      if (result.rows.length)
+      {
+        console.log('data exist in database');
+        res.send(result.rows[0]);
+      }
+      else
+      {
+        console.log(cityName);
+        console.log('data  not exist in database');
 
-    })
+        let key = process.env.LOCATION_KEY;
+        let LocationURL = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${cityName}&format=json`;
 
-    .catch(error => {
-      console.log('inside superagent');
-      console.log('Error in getting data from LocationIQ server');
-      console.error(error);
-      res.send(error);
+        superagent.get(LocationURL)
+          .then(geoData => {
+            console.log('inside superagent');
+            // console.log(geoData.body);
+            let gData = geoData.body;
+            const locationData = new Location(cityName, gData);
+            // res.send(locationData);
+            let sql2 = `INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4) RETURNING * ;`;
+            let safeValue2 =[locationData.search_query,locationData.formatted_query,locationData.latitude,locationData.longitude];
+            client.query(sql2 , safeValue2)
+              .then(result =>{
+                console.log('data inserted ');
+                res.send(result.rows[0]);
+
+              });
+
+
+          })
+
+          .catch(error => {
+            console.log('inside superagent');
+            console.log('Error in getting data from LocationIQ server');
+            console.error(error);
+            res.send(error);
+          });
+      }
+
     });
-}
+
 
 
 
@@ -139,8 +109,6 @@ function weatherHandler(req,res)
       res.send(error);
     });
 
-
-
 }
 
 function parksHandler(req, res) {
@@ -166,8 +134,6 @@ function parksHandler(req, res) {
       console.error(error);
       res.send(error);
     });
-
-
 
 }
 
